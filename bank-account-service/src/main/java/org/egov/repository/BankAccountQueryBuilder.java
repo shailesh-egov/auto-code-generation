@@ -1,10 +1,6 @@
 package org.egov.repository;
 
-import org.egov.common.contract.models.Document;
-import org.egov.web.models.BankAccount;
-import org.egov.web.models.BankAccountDetails;
 import org.egov.web.models.BankAccountSearchCriteria;
-import org.egov.web.models.BankBranchIdentifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -15,40 +11,11 @@ import java.util.List;
 @Component
 public class BankAccountQueryBuilder {
 
-    // Base queries for insert operations
-    private static final String INSERT_BANK_ACCOUNT_QUERY = 
-        "INSERT INTO eg_bank_account (id, tenant_id, service_code, reference_id, additional_details, " +
-        "created_by, last_modified_by, created_time, last_modified_time) " +
-        "VALUES (?, ?, ?, ?, ?::JSONB, ?, ?, ?, ?)";
-
-    private static final String INSERT_BANK_ACCOUNT_DETAIL_QUERY = 
-        "INSERT INTO eg_bank_account_detail (id, tenant_id, bank_account_id, account_holder_name, " +
-        "account_number, account_type, is_primary, is_active, additional_details, " +
-        "created_by, last_modified_by, created_time, last_modified_time) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::JSONB, ?, ?, ?, ?)";
-
-    private static final String INSERT_BANK_BRANCH_IDENTIFIER_QUERY = 
-        "INSERT INTO eg_bank_branch_identifier (id, bank_account_detail_id, type, code, additional_details) " +
-        "VALUES (?, ?, ?, ?, ?::JSONB)";
-
-    private static final String INSERT_BANK_ACCOUNT_DOCUMENT_QUERY = 
-        "INSERT INTO eg_bank_accounts_doc (id, bank_account_detail_id, document_type, file_store, " +
-        "document_uid, additional_details) " +
-        "VALUES (?, ?, ?, ?, ?, ?::JSONB)";
-
-    // Base queries for update operations
-    private static final String UPDATE_BANK_ACCOUNT_QUERY = 
-        "UPDATE eg_bank_account SET service_code = ?, reference_id = ?, additional_details = ?::JSONB, " +
-        "last_modified_by = ?, last_modified_time = ? WHERE id = ?";
-
-    private static final String UPDATE_BANK_ACCOUNT_DETAIL_QUERY = 
-        "UPDATE eg_bank_account_detail SET account_holder_name = ?, account_number = ?, " +
-        "account_type = ?, is_primary = ?, is_active = ?, additional_details = ?::JSONB, " +
-        "last_modified_by = ?, last_modified_time = ? WHERE id = ?";
-
-    private static final String UPDATE_BANK_BRANCH_IDENTIFIER_QUERY = 
-        "UPDATE eg_bank_branch_identifier SET type = ?, code = ?, additional_details = ?::JSONB " +
-        "WHERE bank_account_detail_id = ?";
+    /**
+     * NOTE: All INSERT/UPDATE queries have been removed as they are now handled
+     * by the DIGIT persister service via Kafka messaging.
+     * This class now only contains search query building functionality.
+     */
 
     // Base search query
     private static final String BASE_SEARCH_QUERY = 
@@ -65,122 +32,8 @@ public class BankAccountQueryBuilder {
         "bbi.additional_details as bbi_additional_details " +
         "FROM eg_bank_account ba " +
         "LEFT JOIN eg_bank_account_detail bad ON ba.id = bad.bank_account_id " +
-        "LEFT JOIN eg_bank_branch_identifier bbi ON bad.id = bbi.bank_account_detail_id ";
-
-    public String getInsertBankAccountQuery() {
-        return INSERT_BANK_ACCOUNT_QUERY;
-    }
-
-    public String getInsertBankAccountDetailQuery() {
-        return INSERT_BANK_ACCOUNT_DETAIL_QUERY;
-    }
-
-    public String getInsertBankBranchIdentifierQuery() {
-        return INSERT_BANK_BRANCH_IDENTIFIER_QUERY;
-    }
-
-    public String getInsertBankAccountDocumentQuery() {
-        return INSERT_BANK_ACCOUNT_DOCUMENT_QUERY;
-    }
-
-    public String getUpdateBankAccountQuery() {
-        return UPDATE_BANK_ACCOUNT_QUERY;
-    }
-
-    public String getUpdateBankAccountDetailQuery() {
-        return UPDATE_BANK_ACCOUNT_DETAIL_QUERY;
-    }
-
-    public String getUpdateBankBranchIdentifierQuery() {
-        return UPDATE_BANK_BRANCH_IDENTIFIER_QUERY;
-    }
-
-    public List<Object> getBankAccountInsertParams(BankAccount bankAccount) {
-        List<Object> params = new ArrayList<>();
-        params.add(bankAccount.getId());
-        params.add(bankAccount.getTenantId());
-        params.add(bankAccount.getServiceCode());
-        params.add(bankAccount.getReferenceId());
-        params.add(bankAccount.getAdditionalFields());
-        params.add(bankAccount.getAuditDetails().getCreatedBy());
-        params.add(bankAccount.getAuditDetails().getLastModifiedBy());
-        params.add(bankAccount.getAuditDetails().getCreatedTime());
-        params.add(bankAccount.getAuditDetails().getLastModifiedTime());
-        return params;
-    }
-
-    public List<Object> getBankAccountDetailInsertParams(BankAccountDetails detail, String bankAccountId) {
-        List<Object> params = new ArrayList<>();
-        params.add(detail.getId());
-        params.add(detail.getTenantId());
-        params.add(bankAccountId);
-        params.add(detail.getAccountHolderName());
-        params.add(detail.getAccountNumber());
-        params.add(detail.getAccountType());
-        params.add(detail.getIsPrimary());
-        params.add(detail.getIsActive());
-        params.add(detail.getAdditionalFields());
-        params.add(detail.getAuditDetails().getCreatedBy());
-        params.add(detail.getAuditDetails().getLastModifiedBy());
-        params.add(detail.getAuditDetails().getCreatedTime());
-        params.add(detail.getAuditDetails().getLastModifiedTime());
-        return params;
-    }
-
-    public List<Object> getBankBranchIdentifierInsertParams(BankBranchIdentifier identifier, String detailId) {
-        List<Object> params = new ArrayList<>();
-        params.add(java.util.UUID.randomUUID().toString());
-        params.add(detailId);
-        params.add(identifier.getType());
-        params.add(identifier.getCode());
-        params.add(identifier.getAdditionalDetails());
-        return params;
-    }
-
-    public List<Object> getBankAccountDocumentInsertParams(Document document, String detailId) {
-        List<Object> params = new ArrayList<>();
-        params.add(java.util.UUID.randomUUID().toString());
-        params.add(detailId);
-        params.add(document.getDocumentType());
-        params.add(document.getFileStoreId());
-        params.add(document.getDocumentUid());
-        params.add(document.getAdditionalDetails());
-        return params;
-    }
-
-    public List<Object> getBankAccountUpdateParams(BankAccount bankAccount) {
-        List<Object> params = new ArrayList<>();
-        params.add(bankAccount.getServiceCode());
-        params.add(bankAccount.getReferenceId());
-        params.add(bankAccount.getAdditionalFields());
-        params.add(bankAccount.getAuditDetails().getLastModifiedBy());
-        params.add(bankAccount.getAuditDetails().getLastModifiedTime());
-        params.add(bankAccount.getId());
-        return params;
-    }
-
-    public List<Object> getBankAccountDetailUpdateParams(BankAccountDetails detail) {
-        List<Object> params = new ArrayList<>();
-        params.add(detail.getAccountHolderName());
-        params.add(detail.getAccountNumber());
-        params.add(detail.getAccountType());
-        params.add(detail.getIsPrimary());
-        params.add(detail.getIsActive());
-        params.add(detail.getAdditionalFields());
-        params.add(detail.getAuditDetails().getLastModifiedBy());
-        params.add(detail.getAuditDetails().getLastModifiedTime());
-        params.add(detail.getId());
-        return params;
-    }
-
-    public List<Object> getBankBranchIdentifierUpdateParams(BankBranchIdentifier identifier, String detailId) {
-        List<Object> params = new ArrayList<>();
-        params.add(identifier.getType());
-        params.add(identifier.getCode());
-        params.add(identifier.getAdditionalDetails());
-        params.add(detailId);
-        return params;
-    }
+        "LEFT JOIN eg_bank_branch_identifier bbi ON bad.id = bbi.bank_account_detail_id " +
+        "WHERE ba.is_deleted = false AND (bad.id IS NULL OR bad.is_deleted = false)";
 
     public String getBankAccountSearchQuery(BankAccountSearchCriteria criteria, List<Object> preparedStmtList) {
         StringBuilder query = new StringBuilder(BASE_SEARCH_QUERY);
@@ -193,7 +46,8 @@ public class BankAccountQueryBuilder {
     }
 
     private void addWhereClause(StringBuilder query, BankAccountSearchCriteria criteria, List<Object> preparedStmtList) {
-        boolean isWhereAdded = false;
+        // Base query already has WHERE clause for is_deleted, so we always use AND
+        boolean isWhereAdded = true;
         
         if (StringUtils.hasText(criteria.getTenantId())) {
             query.append(isWhereAdded ? " AND " : " WHERE ");

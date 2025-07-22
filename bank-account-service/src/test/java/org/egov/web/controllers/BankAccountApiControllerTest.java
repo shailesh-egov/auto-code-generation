@@ -61,7 +61,7 @@ public class BankAccountApiControllerTest {
 
     @Test
     public void testCreateBankAccount() {
-        // Mock service response
+        // Mock service response (now returns enriched accounts, async processing via Kafka)
         when(bankAccountService.createBankAccount(any(BankAccountRequest.class)))
                 .thenReturn(bankAccounts);
 
@@ -72,14 +72,14 @@ public class BankAccountApiControllerTest {
         // Call the controller method
         ResponseEntity<BankAccountResponse> response = controller.createBankAccount(bankAccountRequest, "application/json");
 
-        // Assertions
+        // Assertions - should return ACCEPTED as processing is async
         assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
         assertEquals(bankAccounts, response.getBody().getBankAccounts());
     }
 
     @Test
     public void testUpdateBankAccount() {
-        // Mock service response
+        // Mock service response (now returns enriched accounts, async processing via Kafka)
         when(bankAccountService.updateBankAccount(any(BankAccountRequest.class)))
                 .thenReturn(bankAccounts);
 
@@ -90,7 +90,7 @@ public class BankAccountApiControllerTest {
         // Call the controller method
         ResponseEntity<BankAccountResponse> response = controller.updateBankAccount(bankAccountRequest, "application/json");
 
-        // Assertions
+        // Assertions - should return ACCEPTED as processing is async
         assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
         assertEquals(bankAccounts, response.getBody().getBankAccounts());
     }

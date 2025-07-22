@@ -51,6 +51,14 @@ public class EnrichmentService {
                     .build();
             bankAccount.setAuditDetails(auditDetails);
 
+            // Set persister pattern fields
+            if (bankAccount.getRowVersion() == null) {
+                bankAccount.setRowVersion(1);
+            }
+            if (bankAccount.getIsDeleted() == null) {
+                bankAccount.setIsDeleted(false);
+            }
+
             // Enrich bank account details
             if (bankAccount.getBankAccountDetails() != null) {
                 for (BankAccountDetails detail : bankAccount.getBankAccountDetails()) {
@@ -149,6 +157,27 @@ public class EnrichmentService {
                 .lastModifiedTime(currentTime)
                 .build();
         detail.setAuditDetails(auditDetails);
+
+        // Set persister pattern fields
+        if (detail.getRowVersion() == null) {
+            detail.setRowVersion(1);
+        }
+        if (detail.getIsDeleted() == null) {
+            detail.setIsDeleted(false);
+        }
+
+        // Enrich bank branch identifier if present
+        if (detail.getBankBranchIdentifier() != null) {
+            if (detail.getBankBranchIdentifier().getId() == null) {
+                detail.getBankBranchIdentifier().setId(UUID.randomUUID().toString());
+            }
+            if (detail.getBankBranchIdentifier().getRowVersion() == null) {
+                detail.getBankBranchIdentifier().setRowVersion(1);
+            }
+            if (detail.getBankBranchIdentifier().getIsDeleted() == null) {
+                detail.getBankBranchIdentifier().setIsDeleted(false);
+            }
+        }
     }
 
     /**
@@ -182,6 +211,31 @@ public class EnrichmentService {
                     .lastModifiedTime(currentTime)
                     .build();
             detail.setAuditDetails(auditDetails);
+        }
+
+        // Update persister pattern fields
+        if (detail.getRowVersion() != null) {
+            detail.setRowVersion(detail.getRowVersion() + 1);
+        } else {
+            detail.setRowVersion(1);
+        }
+        if (detail.getIsDeleted() == null) {
+            detail.setIsDeleted(false);
+        }
+
+        // Enrich bank branch identifier if present
+        if (detail.getBankBranchIdentifier() != null) {
+            if (detail.getBankBranchIdentifier().getId() == null) {
+                detail.getBankBranchIdentifier().setId(UUID.randomUUID().toString());
+            }
+            if (detail.getBankBranchIdentifier().getRowVersion() != null) {
+                detail.getBankBranchIdentifier().setRowVersion(detail.getBankBranchIdentifier().getRowVersion() + 1);
+            } else {
+                detail.getBankBranchIdentifier().setRowVersion(1);
+            }
+            if (detail.getBankBranchIdentifier().getIsDeleted() == null) {
+                detail.getBankBranchIdentifier().setIsDeleted(false);
+            }
         }
     }
 

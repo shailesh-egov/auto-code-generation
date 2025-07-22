@@ -29,4 +29,13 @@ public class BankBranchIdentifier {
 
     @JsonProperty("additionalDetails")
     private Object additionalDetails;
+
+    @JsonProperty("id")
+    private String id;
+
+    @JsonProperty("rowVersion")
+    private Integer rowVersion;
+
+    @JsonProperty("isDeleted")
+    private Boolean isDeleted;
 }

@@ -1,0 +1,38 @@
+# Ignore Maven/Gradle build output
+/target/
+/build/
+**/target/
+
+# Ignore IntelliJ IDEA project files
+.idea/
+*.iml
+*.iws
+
+# Ignore Node.js modules
+node_modules/
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+
+# Ignore compiled Java class files
+*.class
+
+# Ignore environment files
+.env
+
+# Ignore generated sources
+/generated-sources/
+/generated-test-sources/
+
+# Ignore other common files
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Ignore Visual Studio Code settings
+.vscode/

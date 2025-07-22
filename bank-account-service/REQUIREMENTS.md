@@ -3,6 +3,8 @@
 ## Overview
 The Bank Account Service is a DIGIT microservice that manages financial account details for both individual and organizational entities. It provides secure storage and management of bank account information with encryption of personally identifiable information (PII).
 
+**Architecture Pattern**: This service follows the DIGIT persister pattern where all CRUD operations are handled asynchronously through Kafka messaging and the persister service, ensuring data consistency, transaction management, and platform compliance.
+
 ## Technical Stack
 
 ### Core Framework
@@ -72,6 +74,42 @@ The Bank Account Service is a DIGIT microservice that manages financial account 
 - eGov ERP Snapshots Repository: https://nexus-repo.egovernments.org/nexus/content/repositories/snapshots/
 - eGov Public Repository Group: https://nexus-repo.egovernments.org/nexus/content/groups/public/
 - eGov DIGIT Repository: https://nexus-repo.digit.org/nexus/content/repositories/snapshots/
+
+## DIGIT Persister Pattern
+
+### Architecture Overview
+The Bank Account Service implements the DIGIT persister pattern for all database operations:
+
+**Read Operations (Synchronous)**:
+- Search operations are handled directly by the service
+- Uses optimized queries with pagination and filtering
+- Returns real-time data from database
+
+**Write Operations (Asynchronous)**:
+- Create, Update, Delete operations are handled via Kafka messaging
+- Service validates, enriches, and publishes messages to Kafka topics
+- Persister service consumes messages and performs actual database operations
+- Ensures data consistency through transaction management
+
+### Persister Configuration
+The service uses a dedicated persister configuration (`bank-account-persister.yml`) that defines:
+- Kafka topic mappings for CRUD operations
+- Database table relationships and dependencies
+- JSON path mappings for complex nested objects
+- Transaction boundaries for multi-table operations
+- Support for encrypted field handling
+
+### Benefits
+1. **Data Consistency**: Transactional integrity across related tables
+2. **Scalability**: Asynchronous processing of write operations
+3. **Platform Compliance**: Follows DIGIT architectural standards
+4. **Maintainability**: Centralized data persistence logic
+5. **Error Handling**: Robust error recovery and dead letter queue support
+
+### Kafka Topics
+- `save-bank-account`: Bank account creation events
+- `update-bank-account`: Bank account update events
+- `delete-bank-account`: Bank account deletion events (soft delete)
 
 ## Application Configuration
 

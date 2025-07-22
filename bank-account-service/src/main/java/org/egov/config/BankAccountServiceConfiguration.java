@@ -91,6 +91,9 @@ public class BankAccountServiceConfiguration {
     
     @Value("${bank.account.kafka.update.topic}")
     private String updateBankAccountTopic;
+    
+    @Value("${bank.account.kafka.delete.topic}")
+    private String deleteBankAccountTopic;
 
     // Search Configuration
     @Value("${bank.account.default.offset}")

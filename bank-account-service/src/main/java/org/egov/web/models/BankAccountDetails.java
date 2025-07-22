@@ -64,4 +64,10 @@ public class BankAccountDetails {
     @JsonProperty("auditDetails")
     @Valid
     private AuditDetails auditDetails;
+
+    @JsonProperty("rowVersion")
+    private Integer rowVersion;
+
+    @JsonProperty("isDeleted")
+    private Boolean isDeleted;
 }
