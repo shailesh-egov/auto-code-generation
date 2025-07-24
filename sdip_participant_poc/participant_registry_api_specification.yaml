@@ -1,0 +1,2292 @@
+openapi: 3.0.3
+info:
+  title: Participant Registry Service API
+  description: |
+    API for managing SDIP participant registration and lifecycle.
+    
+    **Architecture**: This service follows DIGIT persister pattern where all write operations 
+    (create, update, delete) are processed asynchronously through Kafka messaging and the 
+    persister service. Read operations are handled synchronously.
+    
+    **Authentication**: Uses Keycloak JWT tokens externally while integrating with DIGIT 
+    services internally using DIGIT RequestInfo format.
+  version: 1.0.0
+  contact:
+    name: SDIP Support Team
+    email: sdip-support@punjab.gov.in
+servers:
+  - url: http://localhost:8080/participant-registry/v1
+    description: Local Development Server
+  - url: https://api-dev.sdip.punjab.gov.in/participant-registry/v1
+    description: Development Environment
+  - url: https://api.sdip.punjab.gov.in/participant-registry/v1
+    description: Production Environment
+
+components:
+  securitySchemes:
+    KeycloakAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Keycloak JWT access token. The token contains user information that will be 
+        extracted by the service and used to construct DIGIT RequestInfo when calling 
+        internal DIGIT services.
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for service-to-service communication
+  
+  schemas:
+    # Standard API Response (not DIGIT format)
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        data:
+          type: object
+          description: "Response data varies by endpoint"
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiError'
+
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "INVALID_REQUEST"
+        message:
+          type: string
+          example: "Required field is missing"
+        field:
+          type: string
+          example: "departmentName"
+          description: "Field name for validation errors"
+        details:
+          type: string
+          example: "The 'departmentName' field is required but was not provided"
+
+    # Keycloak User Context (extracted from JWT)
+    UserContext:
+      type: object
+      description: "User information extracted from Keycloak JWT token (not sent in request)"
+      properties:
+        userId:
+          type: string
+          example: "user-uuid-12345"
+        username:
+          type: string
+          example: "dept.admin"
+        email:
+          type: string
+          example: "admin@dept.punjab.gov.in"
+        name:
+          type: string
+          example: "Department Administrator"
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["PARTICIPANT_APPLICANT", "DEPARTMENT_USER"]
+        tenantId:
+          type: string
+          example: "pb"
+
+    # Kafka Event Schemas (for persister integration)
+    ParticipantRegistrationEvent:
+      type: object
+      description: "Kafka event structure for participant registration operations"
+      properties:
+        RequestInfo:
+          $ref: '#/components/schemas/DIGITRequestInfo'
+        registrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantRegistrationKafka'
+
+    ParticipantRegistrationKafka:
+      type: object
+      description: "Participant registration data structure for Kafka/Persister"
+      properties:
+        id:
+          type: string
+          example: "reg-uuid-12345"
+        tenantId:
+          type: string
+          example: "pb"
+        applicationId:
+          type: string
+          example: "REG-2024-01-000001"
+        departmentName:
+          type: string
+          example: "Department of Social Welfare"
+        departmentType:
+          type: string
+          enum: ["GOVERNMENT_DEPARTMENT", "LOCAL_BODY", "AUTHORIZED_AGENCY"]
+          example: "GOVERNMENT_DEPARTMENT"
+        contactPersonName:
+          type: string
+          example: "Dr. Rajesh Kumar"
+        contactPersonEmail:
+          type: string
+          example: "rajesh.kumar@punjab.gov.in"
+        contactPersonPhone:
+          type: string
+          example: "+91-9876543210"
+        technicalContactName:
+          type: string
+          example: "Amit Singh"
+        technicalContactEmail:
+          type: string
+          example: "amit.singh@punjab.gov.in"
+        technicalContactPhone:
+          type: string
+          example: "+91-9876543211"
+        apiEndpoint:
+          type: string
+          example: "https://api.socialwelfare.punjab.gov.in"
+        apiDocumentationUrl:
+          type: string
+          example: "https://docs.socialwelfare.punjab.gov.in/api"
+        requestedRoles:
+          type: array
+          items:
+            type: string
+            enum: ["DATA_PROVIDER", "DATA_CONSUMER", "CERTIFICATE_ISSUER"]
+          example: ["DATA_PROVIDER", "DATA_CONSUMER"]
+        capabilities:
+          type: array
+          items:
+            type: string
+          example: ["CITIZEN_WELFARE_SCHEMES", "BENEFICIARY_DATA"]
+        status:
+          type: string
+          enum: ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "ACTIVE"]
+          example: "SUBMITTED"
+        workflowCode:
+          type: string
+          example: "participant.registration"
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantDocumentKafka'
+        additionalDetails:
+          type: object
+          example: {}
+        auditDetails:
+          $ref: '#/components/schemas/AuditDetails'
+
+    ParticipantDocumentKafka:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "doc-uuid-12345"
+        documentType:
+          type: string
+          example: "AUTHORIZATION_LETTER"
+        fileStoreId:
+          type: string
+          example: "filestore-uuid-67890"
+        documentUid:
+          type: string
+          example: "AUTH_LETTER_20240115"
+        additionalDetails:
+          type: object
+          example: {}
+
+    ParticipantEvent:
+      type: object
+      description: "Kafka event structure for activated participant operations"
+      properties:
+        RequestInfo:
+          $ref: '#/components/schemas/DIGITRequestInfo'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantKafka'
+
+    ParticipantKafka:
+      type: object
+      description: "Activated participant data structure for Kafka/Persister"
+      properties:
+        id:
+          type: string
+          example: "participant-uuid-12345"
+        tenantId:
+          type: string
+          example: "pb"
+        participantId:
+          type: string
+          example: "DEPT-PB-000001-A4B2"
+        applicationId:
+          type: string
+          example: "REG-2024-01-000001"
+        departmentName:
+          type: string
+          example: "Department of Social Welfare"
+        departmentType:
+          type: string
+          example: "GOVERNMENT_DEPARTMENT"
+        contactPersonName:
+          type: string
+          example: "Dr. Rajesh Kumar"
+        contactPersonEmail:
+          type: string
+          example: "rajesh.kumar@punjab.gov.in"
+        contactPersonPhone:
+          type: string
+          example: "+91-9876543210"
+        technicalContactName:
+          type: string
+          example: "Amit Singh"
+        technicalContactEmail:
+          type: string
+          example: "amit.singh@punjab.gov.in"
+        technicalContactPhone:
+          type: string
+          example: "+91-9876543211"
+        apiEndpoint:
+          type: string
+          example: "https://api.socialwelfare.punjab.gov.in"
+        apiDocumentationUrl:
+          type: string
+          example: "https://docs.socialwelfare.punjab.gov.in/api"
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["DATA_PROVIDER", "DATA_CONSUMER"]
+        capabilities:
+          type: array
+          items:
+            type: string
+          example: ["CITIZEN_WELFARE_SCHEMES", "BENEFICIARY_DATA"]
+        status:
+          type: string
+          enum: ["ACTIVE", "SUSPENDED", "REVOKED"]
+          example: "ACTIVE"
+        isActive:
+          type: boolean
+          example: true
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantKeyKafka'
+        additionalDetails:
+          type: object
+          example: {}
+        auditDetails:
+          $ref: '#/components/schemas/AuditDetails'
+
+    ParticipantKeyKafka:
+      type: object
+      description: "Participant cryptographic key data for Kafka/Persister"
+      properties:
+        id:
+          type: string
+          example: "key-uuid-12345"
+        keyIdentifier:
+          type: string
+          example: "DEPT-PB-000001-SIGN-2024"
+        publicKey:
+          type: string
+          example: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+        algorithm:
+          type: string
+          enum: ["RSA", "ECC"]
+          example: "RSA"
+        keyPurpose:
+          type: string
+          enum: ["SIGNING", "ENCRYPTION", "VERIFICATION"]
+          example: "SIGNING"
+        creationDate:
+          type: integer
+          format: int64
+          example: 1705311000000
+        expirationDate:
+          type: integer
+          format: int64
+          example: 1736847000000
+        status:
+          type: string
+          enum: ["ACTIVE", "EXPIRED", "REVOKED"]
+          example: "ACTIVE"
+        isActive:
+          type: boolean
+          example: true
+        additionalDetails:
+          type: object
+          example: {}
+
+    AuditDetails:
+      type: object
+      description: "Standard DIGIT audit details"
+      properties:
+        createdBy:
+          type: string
+          example: "user-uuid-12345"
+        lastModifiedBy:
+          type: string
+          example: "user-uuid-12345"
+        createdTime:
+          type: integer
+          format: int64
+          example: 1705311000000
+        lastModifiedTime:
+          type: integer
+          format: int64
+          example: 1705311000000
+
+    # Internal DIGIT RequestInfo (used when calling DIGIT services)
+    DIGITRequestInfo:
+      type: object
+      description: "Internal format used when calling DIGIT services (not exposed in API)"
+      required:
+        - apiId
+        - ver
+        - ts
+        - msgId
+      properties:
+        apiId:
+          type: string
+          example: "participant-registry-service"
+        ver:
+          type: string
+          example: "1.0.0"
+        ts:
+          type: integer
+          format: int64
+          example: 1705311000000
+        action:
+          type: string
+          example: ""
+        did:
+          type: integer
+          example: 1
+        key:
+          type: string
+          example: ""
+        msgId:
+          type: string
+          example: "20240115130900|en_IN"
+        requesterId:
+          type: string
+          example: ""
+        authToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        userInfo:
+          $ref: '#/components/schemas/DIGITUserInfo'
+        plainAccessRequest:
+          type: object
+
+    DIGITUserInfo:
+      type: object
+      description: "DIGIT format user info (constructed from Keycloak token)"
+      properties:
+        id:
+          type: integer
+          example: 101
+        uuid:
+          type: string
+          example: "user-uuid-12345"
+        userName:
+          type: string
+          example: "dept.admin"
+        name:
+          type: string
+          example: "Department Administrator"
+        mobileNumber:
+          type: string
+          example: "9876543210"
+        emailId:
+          type: string
+          example: "admin@dept.punjab.gov.in"
+        type:
+          type: string
+          enum: ["EMPLOYEE", "CITIZEN", "SYSTEM"]
+          example: "EMPLOYEE"
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/DIGITRole'
+        active:
+          type: boolean
+          example: true
+        tenantId:
+          type: string
+          example: "pb"
+
+    DIGITRole:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Participant Applicant"
+        code:
+          type: string
+          example: "PARTICIPANT_APPLICANT"
+        tenantId:
+          type: string
+          example: "pb"
+
+    SelfRegistrationRequest:
+      type: object
+      required:
+        - departmentName
+        - adminName
+        - adminEmail
+        - adminMobile
+        - departmentType
+      properties:
+        departmentName:
+          type: string
+          example: "Department of Social Welfare"
+          description: "Official name of the department"
+        departmentAbbreviation:
+          type: string
+          example: "DSW"
+          description: "Short abbreviation for the department"
+        adminName:
+          type: string
+          example: "John Doe"
+          description: "Name of the department administrator"
+        adminEmail:
+          type: string
+          format: email
+          example: "john.doe@dsw.punjab.gov.in"
+          description: "Email address of the department administrator"
+        adminMobile:
+          type: string
+          pattern: "^[6-9]\\d{9}$"
+          example: "9876543210"
+          description: "Mobile number of the department administrator"
+        departmentType:
+          type: string
+          enum: ["GOVERNMENT_DEPARTMENT", "LOCAL_BODY", "AUTHORIZED_AGENCY"]
+          example: "GOVERNMENT_DEPARTMENT"
+          description: "Type of organization"
+        departmentAddress:
+          type: string
+          example: "Punjab Civil Secretariat, Sector 1, Chandigarh"
+          description: "Official address of the department"
+        districtCode:
+          type: string
+          example: "CHD"
+          description: "District code (required for local bodies)"
+        organizationType:
+          type: string
+          example: "RELIGIOUS"
+          description: "Specific type for authorized agencies"
+
+    SelfRegistrationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Self-registration successful. Login credentials will be sent to your email."
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        data:
+          type: object
+          properties:
+            registrationId:
+              type: string
+              example: "SELF-REG-2024-01-000001"
+              description: "Unique self-registration identifier"
+            loginCredentials:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "dsw_admin_001"
+                temporaryPassword:
+                  type: string
+                  example: "Temp@123456"
+                loginUrl:
+                  type: string
+                  example: "https://participant-portal.sdip.punjab.gov.in/login"
+
+    ParticipantRegistrationRequest:
+      type: object
+      required:
+        - departmentDetails
+        - contactInformation
+        - technicalDetails
+        - requestedRoles
+      properties:
+        departmentDetails:
+          $ref: '#/components/schemas/DepartmentDetails'
+        contactInformation:
+          $ref: '#/components/schemas/ContactInformation'
+        technicalDetails:
+          $ref: '#/components/schemas/TechnicalDetails'
+        requestedRoles:
+          type: array
+          items:
+            type: string
+            enum: ["DATA_PROVIDER", "DATA_CONSUMER", "CERTIFICATE_ISSUER"]
+          example: ["DATA_PROVIDER", "DATA_CONSUMER"]
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceCapability'
+        supportingDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+
+    DepartmentDetails:
+      type: object
+      required:
+        - officialName
+        - departmentType
+        - parentDepartment
+      properties:
+        officialName:
+          type: string
+          example: "Department of Social Welfare, Punjab"
+        abbreviation:
+          type: string
+          example: "DSW-PB"
+        departmentType:
+          type: string
+          enum: ["GOVERNMENT_DEPARTMENT", "LOCAL_BODY", "AUTHORIZED_AGENCY"]
+        parentDepartment:
+          type: string
+          example: "Government of Punjab"
+        establishmentYear:
+          type: integer
+          example: 1950
+        description:
+          type: string
+          example: "Responsible for social welfare schemes and programs"
+        website:
+          type: string
+          format: uri
+          example: "https://dsw.punjab.gov.in"
+
+    ContactInformation:
+      type: object
+      required:
+        - primaryContactName
+        - primaryContactEmail
+        - primaryContactMobile
+        - officialAddress
+      properties:
+        primaryContactName:
+          type: string
+          example: "John Doe"
+        primaryContactEmail:
+          type: string
+          format: email
+          example: "john.doe@dsw.punjab.gov.in"
+        primaryContactMobile:
+          type: string
+          example: "9876543210"
+        primaryContactDesignation:
+          type: string
+          example: "Deputy Director"
+        technicalContactName:
+          type: string
+          example: "Jane Smith"
+        technicalContactEmail:
+          type: string
+          format: email
+          example: "jane.smith@dsw.punjab.gov.in"
+        technicalContactMobile:
+          type: string
+          example: "9876543211"
+        officialAddress:
+          type: string
+          example: "Punjab Civil Secretariat, Sector 1, Chandigarh - 160001"
+        district:
+          type: string
+          example: "Chandigarh"
+        state:
+          type: string
+          example: "Punjab"
+        pincode:
+          type: string
+          example: "160001"
+
+    TechnicalDetails:
+      type: object
+      required:
+        - apiBaseUrl
+        - supportedProtocols
+        - dataFormats
+      properties:
+        apiBaseUrl:
+          type: string
+          format: uri
+          example: "https://api.dsw.punjab.gov.in/v1"
+        supportedProtocols:
+          type: array
+          items:
+            type: string
+            enum: ["HTTPS", "HTTP", "SFTP", "FTPS"]
+          example: ["HTTPS"]
+        dataFormats:
+          type: array
+          items:
+            type: string
+            enum: ["JSON", "XML", "CSV", "PDF"]
+          example: ["JSON", "XML"]
+        authenticationMethods:
+          type: array
+          items:
+            type: string
+            enum: ["JWT", "OAUTH2", "API_KEY", "MUTUAL_TLS"]
+          example: ["JWT", "OAUTH2"]
+        rateLimits:
+          type: object
+          properties:
+            requestsPerMinute:
+              type: integer
+              example: 100
+            requestsPerHour:
+              type: integer
+              example: 5000
+            requestsPerDay:
+              type: integer
+              example: 50000
+        ipWhitelist:
+          type: array
+          items:
+            type: string
+          example: ["203.0.113.1", "203.0.113.2"]
+        securityMeasures:
+          type: object
+          properties:
+            encryptionAtRest:
+              type: boolean
+              example: true
+            encryptionInTransit:
+              type: boolean
+              example: true
+            dataBackupFrequency:
+              type: string
+              example: "DAILY"
+            auditLogRetention:
+              type: string
+              example: "7_YEARS"
+
+    ServiceCapability:
+      type: object
+      required:
+        - serviceName
+        - serviceType
+        - dataSchema
+      properties:
+        serviceName:
+          type: string
+          example: "Beneficiary Verification Service"
+        serviceDescription:
+          type: string
+          example: "Verifies eligibility of citizens for social welfare schemes"
+        serviceType:
+          type: string
+          enum: ["DATA_API", "CERTIFICATE_API", "VERIFICATION_API", "NOTIFICATION_API"]
+        dataSchema:
+          type: string
+          example: "beneficiary-verification-v1.json"
+        apiEndpoint:
+          type: string
+          example: "/beneficiaries/verify"
+        httpMethods:
+          type: array
+          items:
+            type: string
+            enum: ["GET", "POST", "PUT", "DELETE"]
+          example: ["POST"]
+        responseTime:
+          type: integer
+          description: "Expected response time in milliseconds"
+          example: 500
+        availability:
+          type: string
+          example: "99.9%"
+
+    Document:
+      type: object
+      required:
+        - documentType
+        - fileName
+        - fileId
+      properties:
+        documentType:
+          type: string
+          enum: ["AUTHORIZATION_LETTER", "TECHNICAL_SPECIFICATION", "DATA_SHARING_AGREEMENT", "SECURITY_CERTIFICATE", "OTHER"]
+        fileName:
+          type: string
+          example: "authorization_letter.pdf"
+        fileId:
+          type: string
+          example: "DOC-2024-01-000001"
+        fileSize:
+          type: integer
+          description: "File size in bytes"
+          example: 1048576
+        uploadedAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        description:
+          type: string
+          example: "Official authorization letter from department head"
+
+    ParticipantRegistrationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Registration application submitted successfully"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        data:
+          type: object
+          properties:
+            applicationId:
+              type: string
+              example: "REG-2024-01-000001"
+            applicationStatus:
+              type: string
+              enum: ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "CLARIFICATION_REQUIRED"]
+              example: "SUBMITTED"
+            submissionDate:
+              type: string
+              format: date-time
+              example: "2024-01-15T10:30:00Z"
+            estimatedProcessingTime:
+              type: string
+              example: "5 business days"
+            trackingUrl:
+              type: string
+              example: "https://participant-portal.sdip.punjab.gov.in/track/REG-2024-01-000001"
+
+    Participant:
+      type: object
+      properties:
+        participantId:
+          type: string
+          example: "DEPT-PB-000001-A4B2"
+        applicationId:
+          type: string
+          example: "REG-2024-01-000001"
+        departmentDetails:
+          $ref: '#/components/schemas/DepartmentDetails'
+        contactInformation:
+          $ref: '#/components/schemas/ContactInformation'
+        technicalDetails:
+          $ref: '#/components/schemas/TechnicalDetails'
+        roles:
+          type: array
+          items:
+            type: string
+            enum: ["DATA_PROVIDER", "DATA_CONSUMER", "CERTIFICATE_ISSUER"]
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceCapability'
+        status:
+          type: string
+          enum: ["ACTIVE", "INACTIVE", "SUSPENDED", "REVOKED", "PENDING"]
+          example: "ACTIVE"
+        registrationDate:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        activationDate:
+          type: string
+          format: date-time
+          example: "2024-01-20T14:45:00Z"
+        lastUpdated:
+          type: string
+          format: date-time
+          example: "2024-01-20T14:45:00Z"
+        cryptographicKeys:
+          $ref: '#/components/schemas/CryptographicKeys'
+        auditInfo:
+          $ref: '#/components/schemas/AuditInfo'
+
+    CryptographicKeys:
+      type: object
+      properties:
+        keyId:
+          type: string
+          example: "KEY-DEPT-PB-000001-2024"
+        publicKey:
+          type: string
+          example: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B..."
+        algorithm:
+          type: string
+          enum: ["RSA", "ECC"]
+          example: "RSA"
+        keySize:
+          type: integer
+          example: 2048
+        purpose:
+          type: array
+          items:
+            type: string
+            enum: ["SIGNING", "ENCRYPTION", "VERIFICATION"]
+          example: ["SIGNING", "VERIFICATION"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-20T14:45:00Z"
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-01-20T14:45:00Z"
+        status:
+          type: string
+          enum: ["ACTIVE", "EXPIRED", "REVOKED"]
+          example: "ACTIVE"
+
+    AuditInfo:
+      type: object
+      properties:
+        createdBy:
+          type: string
+          example: "system"
+        createdTime:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        lastModifiedBy:
+          type: string
+          example: "sdip-admin"
+        lastModifiedTime:
+          type: string
+          format: date-time
+          example: "2024-01-20T14:45:00Z"
+
+    ApplicationSearchCriteria:
+      type: object
+      properties:
+        applicationIds:
+          type: array
+          items:
+            type: string
+          example: ["REG-2024-01-000001", "REG-2024-01-000002"]
+        statuses:
+          type: array
+          items:
+            type: string
+            enum: ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "CLARIFICATION_REQUIRED"]
+          example: ["SUBMITTED", "UNDER_REVIEW"]
+        departmentTypes:
+          type: array
+          items:
+            type: string
+            enum: ["GOVERNMENT_DEPARTMENT", "LOCAL_BODY", "AUTHORIZED_AGENCY"]
+        submissionDateFrom:
+          type: string
+          format: date
+          example: "2024-01-01"
+        submissionDateTo:
+          type: string
+          format: date
+          example: "2024-01-31"
+        assignedToMe:
+          type: boolean
+          example: false
+        sortBy:
+          type: string
+          enum: ["submissionDate", "departmentName", "status"]
+          example: "submissionDate"
+        sortOrder:
+          type: string
+          enum: ["ASC", "DESC"]
+          example: "DESC"
+        offset:
+          type: integer
+          minimum: 0
+          example: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+
+    ParticipantSearchCriteria:
+      type: object
+      properties:
+        participantIds:
+          type: array
+          items:
+            type: string
+          example: ["DEPT-PB-000001-A4B2"]
+        departmentNames:
+          type: array
+          items:
+            type: string
+          example: ["Department of Social Welfare"]
+        roles:
+          type: array
+          items:
+            type: string
+            enum: ["DATA_PROVIDER", "DATA_CONSUMER", "CERTIFICATE_ISSUER"]
+        statuses:
+          type: array
+          items:
+            type: string
+            enum: ["ACTIVE", "INACTIVE", "SUSPENDED", "REVOKED"]
+        registrationDateFrom:
+          type: string
+          format: date
+          example: "2024-01-01"
+        registrationDateTo:
+          type: string
+          format: date
+          example: "2024-01-31"
+        sortBy:
+          type: string
+          enum: ["registrationDate", "departmentName", "status"]
+          example: "registrationDate"
+        sortOrder:
+          type: string
+          enum: ["ASC", "DESC"]
+          example: "DESC"
+        offset:
+          type: integer
+          minimum: 0
+          example: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+
+    ApplicationApprovalRequest:
+      type: object
+      required:
+        - action
+        - comments
+      properties:
+        action:
+          type: string
+          enum: ["APPROVE", "REJECT", "SEND_BACK_FOR_CLARIFICATION", "FORWARD_TO_TECHNICAL_REVIEW"]
+          example: "APPROVE"
+        comments:
+          type: string
+          example: "All requirements met. Approved for activation."
+        assignTo:
+          type: string
+          example: "technical-reviewer-uuid"
+          description: "UUID of user to assign the application to (required for FORWARD actions)"
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "INVALID_REQUEST"
+        message:
+          type: string
+          example: "Required field is missing"
+        description:
+          type: string
+          example: "The 'departmentName' field is required but was not provided"
+        params:
+          type: array
+          items:
+            type: string
+          example: ["departmentName"]
+
+paths:
+  /auth/self-register:
+    post:
+      tags:
+        - Authentication
+      summary: Self-registration for department administrators
+      description: |
+        Allows department administrators to create an account for participant registration.
+        This is the first step in the two-phase registration process.
+        No authentication required for this endpoint.
+      operationId: selfRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfRegistrationRequest'
+            examples:
+              government_department:
+                summary: Government Department Registration
+                value:
+                  departmentName: "Department of Social Welfare"
+                  departmentAbbreviation: "DSW"
+                  adminName: "John Doe"
+                  adminEmail: "john.doe@dsw.punjab.gov.in"
+                  adminMobile: "9876543210"
+                  departmentType: "GOVERNMENT_DEPARTMENT"
+                  departmentAddress: "Punjab Civil Secretariat, Sector 1, Chandigarh"
+              local_body:
+                summary: Local Body Registration
+                value:
+                  departmentName: "Municipal Corporation Amritsar"
+                  departmentAbbreviation: "MCA"
+                  adminName: "Jane Smith"
+                  adminEmail: "jane.smith@mcamritsar.org"
+                  adminMobile: "9876543211"
+                  departmentType: "LOCAL_BODY"
+                  departmentAddress: "Town Hall, Amritsar, Punjab"
+                  districtCode: "AMR"
+      responses:
+        '200':
+          description: Self-registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelfRegistrationResponse'
+              examples:
+                success:
+                  summary: Successful self-registration
+                  value:
+                    success: true
+                    message: "Self-registration successful. Login credentials will be sent to your email."
+                    timestamp: "2024-01-15T10:30:00Z"
+                    data:
+                      registrationId: "SELF-REG-2024-01-000001"
+                      loginCredentials:
+                        username: "dsw_admin_001"
+                        temporaryPassword: "Temp@123456"
+                        loginUrl: "https://participant-portal.sdip.punjab.gov.in/login"
+        '400':
+          description: Bad request - validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                validation_error:
+                  summary: Validation error
+                  value:
+                    success: false
+                    message: "Validation failed"
+                    timestamp: "2024-01-15T10:30:00Z"
+                    errors:
+                      - code: "INVALID_EMAIL"
+                        message: "Invalid email format"
+                        field: "adminEmail"
+                        details: "The provided email address is not in valid format"
+        '409':
+          description: Conflict - email or department already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                conflict_error:
+                  summary: Email already registered
+                  value:
+                    success: false
+                    message: "Email address already registered"
+                    timestamp: "2024-01-15T10:30:00Z"
+                    errors:
+                      - code: "EMAIL_ALREADY_EXISTS"
+                        message: "Email address already registered"
+                        field: "adminEmail"
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with credentials received from self-registration
+      description: |
+        Authenticates department administrator using credentials received via email.
+        Returns Keycloak JWT access token for subsequent API calls.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: "dsw_admin_001"
+                password:
+                  type: string
+                  example: "Temp@123456"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                login_success:
+                  summary: Successful login
+                  value:
+                    success: true
+                    message: "Login successful"
+                    timestamp: "2024-01-15T10:30:00Z"
+                    data:
+                      accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      tokenType: "Bearer"
+                      expiresIn: 3600
+                      userInfo:
+                        userId: "user-uuid-12345"
+                        username: "dsw_admin_001"
+                        email: "john.doe@dsw.punjab.gov.in"
+                        name: "John Doe"
+                        roles: ["PARTICIPANT_APPLICANT", "DEPARTMENT_USER"]
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                invalid_credentials:
+                  summary: Invalid username or password
+                  value:
+                    success: false
+                    message: "Invalid username or password"
+                    timestamp: "2024-01-15T10:30:00Z"
+        '423':
+          description: Account locked due to multiple failed attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change password after first login
+      description: Allows user to change temporary password to a permanent one
+      operationId: changePassword
+      security:
+        - KeycloakAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  example: "Temp@123456"
+                newPassword:
+                  type: string
+                  example: "MyNewSecurePassword@2024"
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                password_changed:
+                  summary: Password changed successfully
+                  value:
+                    success: true
+                    message: "Password changed successfully"
+                    timestamp: "2024-01-15T10:30:00Z"
+        '400':
+          description: Invalid password format or current password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /participants/register:
+    post:
+      tags:
+        - Participant Management
+      summary: Submit participant registration application
+      description: |
+        Submit complete participant registration application after login.
+        This is the second phase of the registration process.
+        Requires Keycloak JWT authentication.
+      operationId: registerParticipant
+      security:
+        - KeycloakAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantRegistrationRequest'
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                registrationData:
+                  type: string
+                  description: JSON string containing ParticipantRegistrationRequest
+                documents:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Supporting documents (PDF, DOC, JPG, PNG)
+      responses:
+        '201':
+          description: Registration application submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantRegistrationResponse'
+        '400':
+          description: Bad request - validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          description: Unauthorized - invalid or expired JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '413':
+          description: File size too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /participants/applications/_search:
+    post:
+      tags:
+        - Participant Management
+      summary: Search participant registration applications
+      description: Search and filter participant registration applications based on various criteria
+      operationId: searchApplications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                ApplicationSearchCriteria:
+                  $ref: '#/components/schemas/ApplicationSearchCriteria'
+      responses:
+        '200':
+          description: Applications found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  applications:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        applicationId:
+                          type: string
+                          example: "REG-2024-01-000001"
+                        departmentName:
+                          type: string
+                          example: "Department of Social Welfare"
+                        departmentType:
+                          type: string
+                          example: "GOVERNMENT_DEPARTMENT"
+                        applicationStatus:
+                          type: string
+                          example: "SUBMITTED"
+                        submissionDate:
+                          type: string
+                          format: date-time
+                        assignedTo:
+                          type: string
+                          example: "SDIP Operator"
+                        slaStatus:
+                          type: string
+                          enum: ["ON_TIME", "APPROACHING_DEADLINE", "OVERDUE"]
+                        daysInCurrentState:
+                          type: integer
+                          example: 2
+                  totalCount:
+                    type: integer
+                    example: 45
+                  pagination:
+                    type: object
+                    properties:
+                      offset:
+                        type: integer
+                        example: 0
+                      limit:
+                        type: integer
+                        example: 20
+                      hasNext:
+                        type: boolean
+                        example: true
+        '401':
+          description: Unauthorized
+
+  /participants/applications/{applicationId}:
+    get:
+      tags:
+        - Participant Management
+      summary: Get application details
+      description: Retrieve detailed information about a specific registration application
+      operationId: getApplicationDetails
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "REG-2024-01-000001"
+      responses:
+        '200':
+          description: Application details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  application:
+                    type: object
+                    properties:
+                      applicationId:
+                        type: string
+                        example: "REG-2024-01-000001"
+                      registrationRequest:
+                        $ref: '#/components/schemas/ParticipantRegistrationRequest'
+                      workflowHistory:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            state:
+                              type: string
+                              example: "SUBMITTED"
+                            action:
+                              type: string
+                              example: "SUBMIT"
+                            actor:
+                              type: string
+                              example: "Department Administrator"
+                            timestamp:
+                              type: string
+                              format: date-time
+                            comments:
+                              type: string
+                              example: "Application submitted for review"
+                      currentStatus:
+                        type: string
+                        example: "UNDER_REVIEW"
+                      assignedTo:
+                        type: string
+                        example: "sdip-operator-uuid"
+                      slaDeadline:
+                        type: string
+                        format: date-time
+                      auditInfo:
+                        $ref: '#/components/schemas/AuditInfo'
+        '404':
+          description: Application not found
+        '401':
+          description: Unauthorized
+
+    put:
+      tags:
+        - Participant Management
+      summary: Update application (resubmit after clarification)
+      description: Update registration application after receiving clarification request
+      operationId: updateApplication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "REG-2024-01-000001"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                ParticipantRegistration:
+                  $ref: '#/components/schemas/ParticipantRegistrationRequest'
+                action:
+                  type: string
+                  enum: ["RESUBMIT", "WITHDRAW"]
+                  example: "RESUBMIT"
+                comments:
+                  type: string
+                  example: "Updated technical specifications as requested"
+      responses:
+        '200':
+          description: Application updated successfully
+        '400':
+          description: Bad request
+        '404':
+          description: Application not found
+        '401':
+          description: Unauthorized
+
+  /admin/applications/_search:
+    post:
+      tags:
+        - Administration
+      summary: Admin search for pending applications
+      description: |
+        Search and filter participant registration applications for administrative review.
+        Available to SDIP administrators and reviewers.
+      operationId: adminSearchApplications
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                ApplicationSearchCriteria:
+                  $ref: '#/components/schemas/ApplicationSearchCriteria'
+      responses:
+        '200':
+          description: Applications found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  applications:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        applicationId:
+                          type: string
+                        departmentDetails:
+                          $ref: '#/components/schemas/DepartmentDetails'
+                        contactInformation:
+                          $ref: '#/components/schemas/ContactInformation'
+                        applicationStatus:
+                          type: string
+                        workflowState:
+                          type: string
+                          example: "TECHNICAL_REVIEW"
+                        assignedTo:
+                          type: string
+                        submissionDate:
+                          type: string
+                          format: date-time
+                        slaStatus:
+                          type: string
+                        priority:
+                          type: string
+                          enum: ["HIGH", "MEDIUM", "LOW"]
+                  totalCount:
+                    type: integer
+                  pagination:
+                    type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - insufficient privileges
+
+  /admin/applications/{applicationId}/_approve:
+    post:
+      tags:
+        - Administration
+      summary: Approve or reject application
+      description: |
+        Administrative action to approve, reject, or request clarification for a registration application.
+        Triggers workflow transition and notifications.
+      operationId: reviewApplication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "REG-2024-01-000001"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                ApprovalRequest:
+                  $ref: '#/components/schemas/ApplicationApprovalRequest'
+      responses:
+        '200':
+          description: Action completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  result:
+                    type: object
+                    properties:
+                      applicationId:
+                        type: string
+                        example: "REG-2024-01-000001"
+                      action:
+                        type: string
+                        example: "APPROVE"
+                      newStatus:
+                        type: string
+                        example: "APPROVED"
+                      participantId:
+                        type: string
+                        example: "DEPT-PB-000001-A4B2"
+                        description: "Generated only for APPROVE action"
+                      message:
+                        type: string
+                        example: "Application approved successfully. Participant ID generated."
+        '400':
+          description: Bad request - invalid action or missing data
+        '404':
+          description: Application not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user not authorized for this action
+
+  /admin/applications/{applicationId}/assign:
+    post:
+      tags:
+        - Administration
+      summary: Assign application to reviewer
+      description: Assign registration application to a specific reviewer for processing
+      operationId: assignApplication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "REG-2024-01-000001"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                assigneeUuid:
+                  type: string
+                  example: "technical-reviewer-uuid-12345"
+                comments:
+                  type: string
+                  example: "Assigning for technical review"
+      responses:
+        '200':
+          description: Assignment successful
+        '400':
+          description: Bad request
+        '404':
+          description: Application or assignee not found
+        '401':
+          description: Unauthorized
+
+  /admin/dashboard/metrics:
+    get:
+      tags:
+        - Administration
+      summary: Get dashboard metrics
+      description: Retrieve key metrics for the administrative dashboard
+      operationId: getDashboardMetrics
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-01-01"
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-01-31"
+      responses:
+        '200':
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  metrics:
+                    type: object
+                    properties:
+                      totalApplications:
+                        type: integer
+                        example: 156
+                      pendingReview:
+                        type: integer
+                        example: 23
+                      approvedApplications:
+                        type: integer
+                        example: 98
+                      rejectedApplications:
+                        type: integer
+                        example: 12
+                      activeParticipants:
+                        type: integer
+                        example: 85
+                      averageProcessingTime:
+                        type: number
+                        example: 4.2
+                        description: "Average processing time in days"
+                      slaCompliance:
+                        type: number
+                        example: 92.5
+                        description: "SLA compliance percentage"
+                      applicationsByStatus:
+                        type: object
+                        properties:
+                          SUBMITTED:
+                            type: integer
+                            example: 15
+                          TECHNICAL_REVIEW:
+                            type: integer
+                            example: 8
+                          ADMIN_APPROVAL:
+                            type: integer
+                            example: 5
+                      applicationsByType:
+                        type: object
+                        properties:
+                          GOVERNMENT_DEPARTMENT:
+                            type: integer
+                            example: 120
+                          LOCAL_BODY:
+                            type: integer
+                            example: 25
+                          AUTHORIZED_AGENCY:
+                            type: integer
+                            example: 11
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /participants/_search:
+    post:
+      tags:
+        - Participant Management
+      summary: Search active participants
+      description: Search and filter active participants in the registry
+      operationId: searchParticipants
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                ParticipantSearchCriteria:
+                  $ref: '#/components/schemas/ParticipantSearchCriteria'
+      responses:
+        '200':
+          description: Participants found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  participants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Participant'
+                  totalCount:
+                    type: integer
+                  pagination:
+                    type: object
+        '401':
+          description: Unauthorized
+
+  /participants/{participantId}:
+    get:
+      tags:
+        - Participant Management
+      summary: Get participant details
+      description: Retrieve detailed information about a specific participant
+      operationId: getParticipantDetails
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DEPT-PB-000001-A4B2"
+      responses:
+        '200':
+          description: Participant details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  participant:
+                    $ref: '#/components/schemas/Participant'
+        '404':
+          description: Participant not found
+        '401':
+          description: Unauthorized
+
+    put:
+      tags:
+        - Participant Management
+      summary: Update participant profile
+      description: Update participant information (requires approval workflow)
+      operationId: updateParticipant
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DEPT-PB-000001-A4B2"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                updates:
+                  type: object
+                  properties:
+                    contactInformation:
+                      $ref: '#/components/schemas/ContactInformation'
+                    technicalDetails:
+                      $ref: '#/components/schemas/TechnicalDetails'
+                    capabilities:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ServiceCapability'
+                comments:
+                  type: string
+                  example: "Updating contact details and adding new API endpoints"
+      responses:
+        '200':
+          description: Update request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  updateRequestId:
+                    type: string
+                    example: "PU-2024-01-000001"
+                  message:
+                    type: string
+                    example: "Profile update request submitted for approval"
+        '400':
+          description: Bad request
+        '404':
+          description: Participant not found
+        '401':
+          description: Unauthorized
+
+  /participants/{participantId}/keys/_rotate:
+    post:
+      tags:
+        - Participant Management
+      summary: Request key rotation
+      description: Request rotation of cryptographic keys for a participant
+      operationId: rotateKeys
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DEPT-PB-000001-A4B2"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                reason:
+                  type: string
+                  enum: ["SCHEDULED_ROTATION", "SECURITY_INCIDENT", "KEY_COMPROMISE", "POLICY_COMPLIANCE"]
+                  example: "SCHEDULED_ROTATION"
+                comments:
+                  type: string
+                  example: "Routine key rotation as per security policy"
+      responses:
+        '200':
+          description: Key rotation request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  rotationRequestId:
+                    type: string
+                    example: "KR-2024-01-000001"
+                  message:
+                    type: string
+                    example: "Key rotation request submitted for approval"
+        '400':
+          description: Bad request
+        '404':
+          description: Participant not found
+        '401':
+          description: Unauthorized
+
+  /participants/{participantId}/status:
+    put:
+      tags:
+        - Participant Management
+      summary: Update participant status
+      description: |
+        Update participant status (suspend, reactivate, revoke).
+        Available only to SDIP administrators.
+      operationId: updateParticipantStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DEPT-PB-000001-A4B2"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                RequestInfo:
+                  $ref: '#/components/schemas/RequestInfo'
+                status:
+                  type: string
+                  enum: ["SUSPEND", "REACTIVATE", "REVOKE"]
+                  example: "SUSPEND"
+                reason:
+                  type: string
+                  example: "Violation of data sharing agreement"
+                effectiveDate:
+                  type: string
+                  format: date-time
+                  example: "2024-01-15T00:00:00Z"
+      responses:
+        '200':
+          description: Status updated successfully
+        '400':
+          description: Bad request
+        '404':
+          description: Participant not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - insufficient privileges
+
+  /documents/upload:
+    post:
+      tags:
+        - Document Management
+      summary: Upload supporting documents
+      description: Upload documents for registration applications
+      operationId: uploadDocuments
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                applicationId:
+                  type: string
+                  example: "REG-2024-01-000001"
+                documentType:
+                  type: string
+                  enum: ["AUTHORIZATION_LETTER", "TECHNICAL_SPECIFICATION", "DATA_SHARING_AGREEMENT", "SECURITY_CERTIFICATE", "OTHER"]
+                description:
+                  type: string
+                  example: "Department authorization letter"
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  document:
+                    $ref: '#/components/schemas/Document'
+        '400':
+          description: Bad request - invalid file type or size
+        '401':
+          description: Unauthorized
+        '413':
+          description: File too large
+
+  /documents/{documentId}:
+    get:
+      tags:
+        - Document Management
+      summary: Download document
+      description: Download a specific document by ID
+      operationId: downloadDocument
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DOC-2024-01-000001"
+      responses:
+        '200':
+          description: Document content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Document not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - no access to this document
+
+    delete:
+      tags:
+        - Document Management
+      summary: Delete document
+      description: Delete a document (only allowed before application submission)
+      operationId: deleteDocument
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DOC-2024-01-000001"
+      responses:
+        '204':
+          description: Document deleted successfully
+        '404':
+          description: Document not found
+        '401':
+          description: Unauthorized
+        '409':
+          description: Conflict - cannot delete document in current application state
+
+  /verify/participant/{participantId}:
+    get:
+      tags:
+        - Verification
+      summary: Verify participant status
+      description: |
+        Verify if a participant is active and authorized.
+        Used by other SDIP services for participant verification.
+      operationId: verifyParticipant
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "DEPT-PB-000001-A4B2"
+      responses:
+        '200':
+          description: Participant verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  verification:
+                    type: object
+                    properties:
+                      participantId:
+                        type: string
+                        example: "DEPT-PB-000001-A4B2"
+                      isActive:
+                        type: boolean
+                        example: true
+                      status:
+                        type: string
+                        example: "ACTIVE"
+                      roles:
+                        type: array
+                        items:
+                          type: string
+                        example: ["DATA_PROVIDER", "DATA_CONSUMER"]
+                      publicKey:
+                        type: string
+                        example: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B..."
+                      keyExpiryDate:
+                        type: string
+                        format: date-time
+                        example: "2026-01-20T14:45:00Z"
+                      verifiedAt:
+                        type: string
+                        format: date-time
+                        example: "2024-01-15T10:30:00Z"
+        '404':
+          description: Participant not found
+        '401':
+          description: Unauthorized
+
+  /lookup/participants:
+    get:
+      tags:
+        - Verification
+      summary: Lookup participants by criteria
+      description: |
+        Lookup participants for service discovery.
+        Returns basic information about participants matching the criteria.
+      operationId: lookupParticipants
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: ["DATA_PROVIDER", "DATA_CONSUMER", "CERTIFICATE_ISSUER"]
+          example: "DATA_PROVIDER"
+        - name: capability
+          in: query
+          schema:
+            type: string
+          example: "beneficiary-verification"
+        - name: departmentType
+          in: query
+          schema:
+            type: string
+            enum: ["GOVERNMENT_DEPARTMENT", "LOCAL_BODY", "AUTHORIZED_AGENCY"]
+        - name: active
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Participants found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ResponseInfo:
+                    $ref: '#/components/schemas/ResponseInfo'
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        participantId:
+                          type: string
+                          example: "DEPT-PB-000001-A4B2"
+                        departmentName:
+                          type: string
+                          example: "Department of Social Welfare"
+                        roles:
+                          type: array
+                          items:
+                            type: string
+                        capabilities:
+                          type: array
+                          items:
+                            type: string
+                        apiBaseUrl:
+                          type: string
+                          example: "https://api.dsw.punjab.gov.in/v1"
+                        publicKey:
+                          type: string
+                  totalCount:
+                    type: integer
+        '401':
+          description: Unauthorized
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Service health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "UP"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00Z"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  dependencies:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "UP"
+                      keycloak:
+                        type: string
+                        example: "UP"
+                      workflow:
+                        type: string
+                        example: "UP"
+                      idgen:
+                        type: string
+                        example: "UP"
+
+security:
+  - KeycloakAuth: []
+
+# Internal DIGIT Service Integration Notes:
+# 
+# The Participant Registry Service uses a hybrid authentication approach:
+# 
+# 1. External APIs (documented above) accept Keycloak JWT tokens
+# 2. User information is extracted from the JWT token claims
+# 3. When calling internal DIGIT services (Workflow, IDGen), the service 
+#    constructs DIGIT RequestInfo format using the extracted user context
+# 
+# Internal DIGIT Service Calls:
+# - DIGIT Workflow Service: Uses DIGITRequestInfo format for workflow transitions
+# - DIGIT IDGen Service: Uses DIGITRequestInfo format for ID generation
+# - Other DIGIT services: Follow standard DIGIT request/response patterns
+# 
+# JWT Token Mapping to DIGIT UserInfo:
+# - JWT 'sub' claim → userInfo.uuid
+# - JWT 'preferred_username' claim → userInfo.userName
+# - JWT 'email' claim → userInfo.emailId
+# - JWT 'name' claim → userInfo.name
+# - JWT 'realm_access.roles' → userInfo.roles (mapped to DIGIT role format)
+# 
+# This approach provides a clean REST API interface while maintaining
+# compatibility with the DIGIT platform's internal service architecture.
