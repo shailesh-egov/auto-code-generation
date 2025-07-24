@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.egov.common.contract.request.RequestInfo;
-import org.egov.common.contract.models.Pagination;
+import org.egov.web.models.Pagination;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;

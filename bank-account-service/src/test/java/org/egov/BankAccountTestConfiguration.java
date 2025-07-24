@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.web.client.RestTemplate;
 
 @TestConfiguration
-public class TestConfiguration {
+public class BankAccountTestConfiguration {
 
     @Bean
     @Primary

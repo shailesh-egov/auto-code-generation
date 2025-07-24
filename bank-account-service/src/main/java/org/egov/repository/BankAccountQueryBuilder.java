@@ -32,8 +32,7 @@ public class BankAccountQueryBuilder {
         "bbi.additional_details as bbi_additional_details " +
         "FROM eg_bank_account ba " +
         "LEFT JOIN eg_bank_account_detail bad ON ba.id = bad.bank_account_id " +
-        "LEFT JOIN eg_bank_branch_identifier bbi ON bad.id = bbi.bank_account_detail_id " +
-        "WHERE ba.is_deleted = false AND (bad.id IS NULL OR bad.is_deleted = false)";
+        "LEFT JOIN eg_bank_branch_identifier bbi ON bad.id = bbi.bank_account_detail_id ";
 
     public String getBankAccountSearchQuery(BankAccountSearchCriteria criteria, List<Object> preparedStmtList) {
         StringBuilder query = new StringBuilder(BASE_SEARCH_QUERY);
@@ -46,8 +45,7 @@ public class BankAccountQueryBuilder {
     }
 
     private void addWhereClause(StringBuilder query, BankAccountSearchCriteria criteria, List<Object> preparedStmtList) {
-        // Base query already has WHERE clause for is_deleted, so we always use AND
-        boolean isWhereAdded = true;
+        boolean isWhereAdded = false;
         
         if (StringUtils.hasText(criteria.getTenantId())) {
             query.append(isWhereAdded ? " AND " : " WHERE ");

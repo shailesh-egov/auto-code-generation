@@ -66,7 +66,7 @@ public class BankAccountApiControllerTest {
                 .thenReturn(bankAccounts);
 
         // Mock response info creator
-        when(responseInfoCreator.createResponseInfoFromRequestInfo(any(), any()))
+        when(responseInfoCreator.createResponseInfoFromRequestInfo(any(), any(Boolean.class)))
                 .thenReturn(new org.egov.common.contract.response.ResponseInfo());
 
         // Call the controller method
@@ -84,7 +84,7 @@ public class BankAccountApiControllerTest {
                 .thenReturn(bankAccounts);
 
         // Mock response info creator
-        when(responseInfoCreator.createResponseInfoFromRequestInfo(any(), any()))
+        when(responseInfoCreator.createResponseInfoFromRequestInfo(any(), any(Boolean.class)))
                 .thenReturn(new org.egov.common.contract.response.ResponseInfo());
 
         // Call the controller method
