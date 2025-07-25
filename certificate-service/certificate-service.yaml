@@ -1,0 +1,674 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: Certificate Service
+  description: |
+    The Certificate Service provides APIs to manage digital certificates in DIGIT platform.
+    It enables secure issuance, storage, retrieval, and verification of digital certificates 
+    following the Verifiable Credentials (VC) standard for government departments and authorized agencies.
+    
+    ### Key Features:
+    - Digital certificate issuance and management
+    - Verifiable Credentials (VC) standard compliance
+    - Cryptographic signature support
+    - Multi-tenant architecture
+    - Bulk operations support
+    - Certificate lifecycle management
+    
+  contact:
+    name: eGovernments Foundation
+    email: contact@egovernments.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://works-dev.digit.org/certificate-service
+    description: Development server
+  - url: https://staging.digit.org/certificate-service  
+    description: Staging server
+
+x-api-id: org.egov.certificate
+x-common-path: https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml
+
+paths:
+  /v1/_create:
+    post:
+      summary: Create Certificate
+      description: |
+        Create one or more certificate entries with digital signatures.
+        API supports bulk creation with validation and enrichment.
+        Uses asynchronous processing via Kafka for data persistence.
+      tags:
+        - Certificate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateRequest'
+            example:
+              RequestInfo:
+                apiId: org.egov.certificate
+                ver: 1.0
+                ts: 1234567890123
+                action: _create
+                did: 1
+                msgId: "20170310130900|en_IN"
+                authToken: "b39181b8-6d88-4b2b-879c-7f4b1acfd2f5"
+                userInfo:
+                  id: 1
+                  userName: "civil.officer"
+                  name: "Civil Officer"
+                  type: "EMPLOYEE"
+                  mobileNumber: "9876543210"
+                  emailId: "civil.officer@punjab.gov.in"
+                  roles:
+                    - name: "CERTIFICATE_ISSUER"
+                      code: "CERTIFICATE_ISSUER"
+                      tenantId: "pb.mohali"
+                  tenants:
+                    - tenantId: "pb.mohali"
+                      roles:
+                        - name: "CERTIFICATE_ISSUER"
+                          code: "CERTIFICATE_ISSUER"
+              certificates:
+                - tenantId: "pb.mohali"
+                  context: "https://www.w3.org/2018/credentials/v1"
+                  type: ["VerifiableCredential", "BirthCertificate"]
+                  issuer:
+                    id: "did:gov:pb:civil-registration"
+                    name: "Civil Registration Department"
+                    type: "DEPARTMENT"
+                  credentialSubject:
+                    id: "did:citizen:pb:1234567890"
+                    name: "Jane Smith"
+                    dateOfBirth: "1990-05-15"
+                    placeOfBirth: "Mohali, Punjab"
+                    fatherName: "Robert Smith"
+                    motherName: "Mary Smith"
+                  additionalDetails:
+                    hospitalName: "City Hospital"
+                    registrationNumber: "BR/2023/001234"
+        required: true
+      responses:
+        '201':
+          description: Certificate(s) created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateResponse'
+        '400':
+          description: Certificate creation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRes'
+
+  /v1/_search:
+    post:
+      summary: Search Certificates
+      description: |
+        Search for certificates based on multiple criteria.
+        Supports pagination, filtering, and sorting.
+        Returns certificates with their complete metadata and proof details.
+      tags:
+        - Certificate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateSearchRequest'
+            example:
+              RequestInfo:
+                apiId: org.egov.certificate
+                ver: 1.0
+                ts: 1234567890123
+                action: _search
+              searchCriteria:
+                tenantId: "pb.mohali"
+                issuerIds: ["did:gov:pb:civil-registration"]
+                certificateTypes: ["BirthCertificate"]
+                status: "ACTIVE"
+                fromDate: 1672531200000
+                toDate: 1704067199000
+                sortBy: "issued"
+                sortOrder: "DESC"
+                limit: 10
+                offset: 0
+        required: true
+      responses:
+        '200':
+          description: Certificates retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateResponse'
+        '400':
+          description: Invalid search criteria
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRes'
+
+  /v1/_update:
+    post:
+      summary: Update Certificate
+      description: |
+        Update one or more certificate entries.
+        Triggers reissuance workflow for certificates with modified data.
+        Maintains audit trail for all changes.
+      tags:
+        - Certificate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateRequest'
+        required: true
+      responses:
+        '200':
+          description: Certificate(s) updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateResponse'
+        '400':
+          description: Certificate update failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRes'
+
+  /v1/_revoke:
+    post:
+      summary: Revoke Certificate
+      description: |
+        Revoke one or more certificates by marking them as REVOKED status.
+        Revoked certificates are excluded from validation processes.
+        Maintains complete audit trail for revocation actions.
+      tags:
+        - Certificate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateRevocationRequest'
+            example:
+              RequestInfo:
+                apiId: org.egov.certificate
+                ver: 1.0
+                ts: 1234567890123
+                action: _revoke
+              revocationDetails:
+                - certificateId: "cert-123456"
+                  reason: "Data correction required"
+                  tenantId: "pb.mohali"
+        required: true
+      responses:
+        '200':
+          description: Certificate(s) revoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateResponse'
+        '400':
+          description: Certificate revocation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRes'
+
+  /v1/_verify:
+    post:
+      summary: Verify Certificate
+      description: |
+        Verify the authenticity and validity of certificates.
+        Checks digital signatures, expiration dates, and revocation status.
+        Returns comprehensive verification results.
+      tags:
+        - Certificate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateVerificationRequest'
+            example:
+              RequestInfo:
+                apiId: org.egov.certificate
+                ver: 1.0
+                ts: 1234567890123
+                action: _verify
+              verificationCriteria:
+                tenantId: "pb.mohali"
+                certificateId: "cert-123e4567-e89b-12d3-a456-426614174000"
+                includeProofValidation: true
+                includeExpiryCheck: true
+                includeRevocationCheck: true
+        required: true
+      responses:
+        '200':
+          description: Certificate verification completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateVerificationResponse'
+        '400':
+          description: Certificate verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRes'
+
+components:
+  schemas:
+    Certificate:
+      type: object
+      description: Digital Certificate following Verifiable Credentials (VC) standard
+      required:
+        - tenantId
+        - context
+        - type
+        - issuer
+        - credentialSubject
+      properties:
+        id:
+          type: string
+          description: Unique Certificate identifier
+          maxLength: 256
+          readOnly: true
+          example: "cert-123e4567-e89b-12d3-a456-426614174000"
+        tenantId:
+          type: string
+          description: Unique tenant identifier
+          maxLength: 128
+          minLength: 2
+          example: "pb.mohali"
+        context:
+          type: string
+          description: W3C credentials context
+          example: "https://www.w3.org/2018/credentials/v1"
+        type:
+          type: array
+          description: Certificate type array
+          items:
+            type: string
+          minItems: 1
+          example: ["VerifiableCredential", "BirthCertificate"]
+        issuer:
+          $ref: '#/components/schemas/Issuer'
+        issued:
+          type: integer
+          format: int64
+          description: Certificate issuance timestamp (epoch milliseconds)
+          readOnly: true
+          example: 1672531200000
+        expirationDate:
+          type: integer
+          format: int64
+          description: Certificate expiry timestamp (epoch milliseconds)
+          example: 1704067199000
+        credentialSubject:
+          type: object
+          description: Actual certificate data and subject information
+          additionalProperties: true
+          example:
+            id: "did:citizen:pb:1234567890"
+            name: "Jane Smith"
+            dateOfBirth: "1990-05-15"
+            placeOfBirth: "Mohali, Punjab"
+            fatherName: "Robert Smith"
+            motherName: "Mary Smith"
+        proof:
+          $ref: '#/components/schemas/Proof'
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, EXPIRED]
+          description: Certificate lifecycle status
+          default: "ACTIVE"
+          example: "ACTIVE"
+        additionalDetails:
+          type: object
+          description: Additional metadata and custom fields
+          additionalProperties: true
+        auditDetails:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/AuditDetails
+
+    Issuer:
+      type: object
+      description: Certificate issuing authority details
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique issuer identifier
+          maxLength: 256
+          example: "did:gov:pb:civil-registration"
+        name:
+          type: string
+          description: Human-readable issuer name
+          maxLength: 256
+          example: "Civil Registration Department"
+        type:
+          type: string
+          enum: [DEPARTMENT, AGENCY, RELIGIOUS_INSTITUTION]
+          description: Type of issuing authority
+          example: "DEPARTMENT"
+
+    Proof:
+      type: object
+      description: Digital signature proof for certificate authenticity
+      readOnly: true
+      properties:
+        type:
+          type: string
+          description: Digital signature algorithm type
+          example: "Ed25519Signature2020"
+        created:
+          type: integer
+          format: int64
+          description: Signature creation timestamp (epoch milliseconds)
+          example: 1672531200000
+        proofPurpose:
+          type: string
+          description: Purpose of the proof
+          example: "assertionMethod"
+        verificationMethod:
+          type: string
+          description: Public key identifier for verification
+          example: "did:gov:pb:civil-registration#key-1"
+        signatureValue:
+          type: string
+          description: Base64 encoded digital signature
+          example: "z58DAdFfa9SkqZMVPxAQpic7ndSayn1PzZs6ZjWp1CktyGesjuTSwRdoWhAfGFCF5bppETSTojQCrfFPP2oumHKtz"
+
+    CertificateRequest:
+      type: object
+      description: Request wrapper for certificate operations
+      required:
+        - RequestInfo
+        - certificates
+      properties:
+        RequestInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/RequestInfo
+        certificates:
+          type: array
+          description: Array of certificates for bulk operations
+          items:
+            $ref: '#/components/schemas/Certificate'
+          minItems: 1
+          maxItems: 100
+
+    CertificateResponse:
+      type: object
+      description: Response wrapper for certificate operations
+      properties:
+        ResponseInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/ResponseInfo
+        certificates:
+          type: array
+          description: Array of processed certificates
+          items:
+            $ref: '#/components/schemas/Certificate'
+          maxItems: 500
+        totalCount:
+          type: integer
+          description: Total number of certificates matching search criteria
+          example: 25
+
+    CertificateSearchRequest:
+      type: object
+      description: Request wrapper for certificate search operations
+      required:
+        - RequestInfo
+        - searchCriteria
+      properties:
+        RequestInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/RequestInfo
+        searchCriteria:
+          $ref: '#/components/schemas/CertificateSearchCriteria'
+
+    CertificateSearchCriteria:
+      type: object
+      description: Search criteria for certificate queries
+      required:
+        - tenantId
+      properties:
+        tenantId:
+          type: string
+          description: Tenant identifier for multi-tenant filtering
+          maxLength: 128
+          example: "pb.mohali"
+        ids:
+          type: array
+          description: List of certificate IDs to retrieve
+          items:
+            type: string
+          maxItems: 50
+        issuerIds:
+          type: array
+          description: List of issuer identifiers to filter by
+          items:
+            type: string
+          maxItems: 10
+        subjectIds:
+          type: array
+          description: List of subject identifiers to filter by
+          items:
+            type: string
+          maxItems: 50
+        certificateTypes:
+          type: array
+          description: List of certificate types to filter by
+          items:
+            type: string
+          maxItems: 10
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, EXPIRED]
+          description: Certificate status filter
+        fromDate:
+          type: integer
+          format: int64
+          description: Filter certificates issued after this date (epoch milliseconds)
+        toDate:
+          type: integer
+          format: int64
+          description: Filter certificates issued before this date (epoch milliseconds)
+        sortBy:
+          type: string
+          enum: [issued, expirationDate, status, issuer]
+          description: Field to sort results by
+          default: "issued"
+        sortOrder:
+          type: string
+          enum: [ASC, DESC]
+          description: Sort order
+          default: "DESC"
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 100
+          description: Maximum number of results to return
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of results to skip for pagination
+
+    CertificateRevocationRequest:
+      type: object
+      description: Request wrapper for certificate revocation
+      required:
+        - RequestInfo
+        - revocationDetails
+      properties:
+        RequestInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/RequestInfo
+        revocationDetails:
+          type: array
+          description: Details for certificates to be revoked
+          items:
+            $ref: '#/components/schemas/RevocationDetail'
+          minItems: 1
+          maxItems: 50
+
+    RevocationDetail:
+      type: object
+      description: Details for certificate revocation
+      required:
+        - certificateId
+        - tenantId
+        - reason
+      properties:
+        certificateId:
+          type: string
+          description: ID of certificate to revoke
+          maxLength: 256
+        tenantId:
+          type: string
+          description: Tenant identifier
+          maxLength: 128
+        reason:
+          type: string
+          description: Reason for revocation
+          maxLength: 512
+          example: "Data correction required"
+
+    CertificateVerificationRequest:
+      type: object
+      description: Request wrapper for certificate verification
+      required:
+        - RequestInfo
+        - verificationCriteria
+      properties:
+        RequestInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/RequestInfo
+        verificationCriteria:
+          $ref: '#/components/schemas/VerificationCriteria'
+
+    VerificationCriteria:
+      type: object
+      description: Criteria for certificate verification
+      required:
+        - tenantId
+        - certificateId
+      properties:
+        tenantId:
+          type: string
+          description: Tenant identifier
+          maxLength: 128
+          example: "pb.mohali"
+        certificateId:
+          type: string
+          description: Certificate ID to verify
+          maxLength: 256
+          example: "cert-123e4567-e89b-12d3-a456-426614174000"
+        includeProofValidation:
+          type: boolean
+          description: Whether to validate digital signatures
+          default: true
+        includeExpiryCheck:
+          type: boolean
+          description: Whether to check certificate expiration
+          default: true
+        includeRevocationCheck:
+          type: boolean
+          description: Whether to check revocation status
+          default: true
+        additionalValidations:
+          type: object
+          description: Additional validation parameters
+          additionalProperties: true
+
+    CertificateVerificationResponse:
+      type: object
+      description: Response wrapper for certificate verification
+      properties:
+        ResponseInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/ResponseInfo
+        verificationResult:
+          $ref: '#/components/schemas/VerificationResult'
+
+    VerificationResult:
+      type: object
+      description: Certificate verification result details
+      properties:
+        certificateId:
+          type: string
+          description: ID of verified certificate
+          example: "cert-123e4567-e89b-12d3-a456-426614174000"
+        isValid:
+          type: boolean
+          description: Overall certificate validity status
+          example: true
+        signatureValid:
+          type: boolean
+          description: Digital signature validation result
+          example: true
+        notExpired:
+          type: boolean
+          description: Certificate expiration status
+          example: true
+        notRevoked:
+          type: boolean
+          description: Certificate revocation status
+          example: true
+        issuerVerified:
+          type: boolean
+          description: Issuer authority verification status
+          example: true
+        verificationTimestamp:
+          type: integer
+          format: int64
+          description: Timestamp when verification was performed
+          example: 1672531200000
+        verificationDetails:
+          type: object
+          description: Detailed verification information
+          additionalProperties: true
+          example:
+            signatureAlgorithm: "Ed25519"
+            keyId: "did:gov:pb:civil-registration#key-1"
+            verificationMethod: "cryptographic"
+
+    ErrorRes:
+      type: object
+      description: Error response wrapper
+      required:
+        - ResponseInfo
+        - Errors
+      properties:
+        ResponseInfo:
+          $ref: >-
+            https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/ResponseInfo
+        Errors:
+          type: array
+          description: List of errors that occurred
+          items:
+            $ref: >-
+              https://raw.githubusercontent.com/egovernments/DIGIT-OSS/master/core-services/docs/common-contract_v1-1.yml#/components/schemas/Error
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for API authentication
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Certificate
+    description: Digital certificate management operations

@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  certificate-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: certificate-service
+    ports:
+      - "8039:8039"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SERVER_PORT=8039
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/certificates
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - KAFKA_CONFIG_BOOTSTRAP_SERVER_CONFIG=kafka:9092
+      - EGOV_IDGEN_HOST=http://egov-idgen:8080/
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - certificate-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/var/log/certificate-service
+
+  postgres:
+    image: postgres:13-alpine
+    container_name: certificate-postgres
+    environment:
+      - POSTGRES_DB=certificates
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - certificate-network
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: certificate-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - certificate-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: certificate-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    networks:
+      - certificate-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  certificate-network:
+    driver: bridge

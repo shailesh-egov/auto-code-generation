@@ -1,0 +1,104 @@
+serviceMaps:
+  serviceName: certificate-service
+  mappings:
+    - version: 1.0
+      description: Persists certificate data
+      fromTopic: save-certificate
+      isTransaction: true
+      queryMaps:
+        - query: INSERT INTO eg_certificate(id, tenant_id, context, certificate_type, issuer_id, issuer_name, issuer_type, subject_id, issued_at, expires_at, status, credential_subject, additional_details, created_by, created_time, last_modified_by, last_modified_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+          basePath: certificates.*
+          jsonMaps:
+            - jsonPath: $.certificates.*.id
+            - jsonPath: $.certificates.*.tenantId
+            - jsonPath: $.certificates.*.context
+            - jsonPath: $.certificates.*.type
+            - jsonPath: $.certificates.*.issuer.id
+            - jsonPath: $.certificates.*.issuer.name
+            - jsonPath: $.certificates.*.issuer.type
+            - jsonPath: $.certificates.*.credentialSubject.id
+            - jsonPath: $.certificates.*.issued
+            - jsonPath: $.certificates.*.expirationDate
+            - jsonPath: $.certificates.*.status
+            - jsonPath: $.certificates.*.credentialSubject
+              type: JSON
+              dbType: JSONB
+            - jsonPath: $.certificates.*.additionalDetails
+              type: JSON
+              dbType: JSONB
+            - jsonPath: $.certificates.*.auditDetails.createdBy
+            - jsonPath: $.certificates.*.auditDetails.createdTime
+            - jsonPath: $.certificates.*.auditDetails.lastModifiedBy
+            - jsonPath: $.certificates.*.auditDetails.lastModifiedTime
+
+        - query: INSERT INTO eg_certificate_proof(id, certificate_id, proof_type, created_at, proof_purpose, verification_method, signature_value, additional_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+          basePath: certificates.*.proof
+          jsonMaps:
+            - jsonPath: $.certificates.*.proof.id
+            - jsonPath: $.certificates.*.id
+            - jsonPath: $.certificates.*.proof.type
+            - jsonPath: $.certificates.*.proof.created
+            - jsonPath: $.certificates.*.proof.proofPurpose
+            - jsonPath: $.certificates.*.proof.verificationMethod
+            - jsonPath: $.certificates.*.proof.signatureValue
+            - jsonPath: $.certificates.*.proof.additionalDetails
+              type: JSON
+              dbType: JSONB
+
+    - version: 1.0
+      description: Updates certificate data
+      fromTopic: update-certificate
+      isTransaction: true
+      queryMaps:
+        - query: UPDATE eg_certificate SET context=?, certificate_type=?, issuer_id=?, issuer_name=?, issuer_type=?, subject_id=?, issued_at=?, expires_at=?, status=?, credential_subject=?, additional_details=?, last_modified_by=?, last_modified_time=? WHERE id=? AND tenant_id=?;
+          basePath: certificates.*
+          jsonMaps:
+            - jsonPath: $.certificates.*.context
+            - jsonPath: $.certificates.*.type[0]
+            - jsonPath: $.certificates.*.issuer.id
+            - jsonPath: $.certificates.*.issuer.name
+            - jsonPath: $.certificates.*.issuer.type
+            - jsonPath: $.certificates.*.credentialSubject.id
+            - jsonPath: $.certificates.*.issued
+            - jsonPath: $.certificates.*.expirationDate
+            - jsonPath: $.certificates.*.status
+            - jsonPath: $.certificates.*.credentialSubject
+              type: JSON
+              dbType: JSONB
+            - jsonPath: $.certificates.*.additionalDetails
+              type: JSON
+              dbType: JSONB
+            - jsonPath: $.certificates.*.auditDetails.lastModifiedBy
+            - jsonPath: $.certificates.*.auditDetails.lastModifiedTime
+            - jsonPath: $.certificates.*.id
+            - jsonPath: $.certificates.*.tenantId
+
+        - query: UPDATE eg_certificate_proof SET proof_type=?, created_at=?, proof_purpose=?, verification_method=?, signature_value=?, additional_details=? WHERE certificate_id=?;
+          basePath: certificates.*.proof
+          jsonMaps:
+            - jsonPath: $.certificates.*.proof.type
+            - jsonPath: $.certificates.*.proof.created
+            - jsonPath: $.certificates.*.proof.proofPurpose
+            - jsonPath: $.certificates.*.proof.verificationMethod
+            - jsonPath: $.certificates.*.proof.signatureValue
+            - jsonPath: $.certificates.*.proof.additionalDetails
+              type: JSON
+              dbType: JSONB
+            - jsonPath: $.certificates.*.id
+
+    - version: 1.0
+      description: Revokes certificate data
+      fromTopic: revoke-certificate
+      isTransaction: true
+      queryMaps:
+        - query: UPDATE eg_certificate SET status=?, additional_details=?, last_modified_by=?, last_modified_time=? WHERE id=? AND tenant_id=?;
+          basePath: certificates.*
+          jsonMaps:
+            - jsonPath: $.certificates.*.status
+            - jsonPath: $.certificates.*.additionalDetails
+              type: JSON
+              dbType: JSONB
+            - jsonPath: $.certificates.*.auditDetails.lastModifiedBy
+            - jsonPath: $.certificates.*.auditDetails.lastModifiedTime
+            - jsonPath: $.certificates.*.id
+            - jsonPath: $.certificates.*.tenantId

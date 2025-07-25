@@ -1,0 +1,390 @@
+{
+	"info": {
+		"_postman_id": "certificate-service-collection",
+		"name": "Certificate Service API",
+		"description": "Postman collection for testing DIGIT Certificate Service endpoints. This service manages digital certificates following W3C Verifiable Credentials standard.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "certificate-service"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Certificate - Birth Certificate",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_create\",\n    \"did\": \"1\",\n    \"msgId\": \"{{$guid}}\",\n    \"authToken\": \"{{auth_token}}\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"civil.officer\",\n      \"name\": \"Civil Officer\",\n      \"type\": \"EMPLOYEE\",\n      \"mobileNumber\": \"9876543210\",\n      \"emailId\": \"civil.officer@punjab.gov.in\",\n      \"uuid\": \"{{$guid}}\",\n      \"roles\": [\n        {\n          \"name\": \"CERTIFICATE_ISSUER\",\n          \"code\": \"CERTIFICATE_ISSUER\",\n          \"tenantId\": \"pb.mohali\"\n        }\n      ],\n      \"tenants\": [\n        {\n          \"tenantId\": \"pb.mohali\",\n          \"roles\": [\n            {\n              \"name\": \"CERTIFICATE_ISSUER\",\n              \"code\": \"CERTIFICATE_ISSUER\"\n            }\n          ]\n        }\n      ]\n    }\n  },\n  \"certificates\": [\n    {\n      \"tenantId\": \"pb.mohali\",\n      \"context\": \"https://www.w3.org/2018/credentials/v1\",\n      \"type\": [\"VerifiableCredential\", \"BirthCertificate\"],\n      \"issuer\": {\n        \"id\": \"did:gov:pb:civil-registration\",\n        \"name\": \"Civil Registration Department\",\n        \"type\": \"DEPARTMENT\"\n      },\n      \"credentialSubject\": {\n        \"id\": \"did:citizen:pb:1234567890\",\n        \"name\": \"Jane Smith\",\n        \"dateOfBirth\": \"1990-05-15\",\n        \"placeOfBirth\": \"Mohali, Punjab\",\n        \"fatherName\": \"Robert Smith\",\n        \"motherName\": \"Mary Smith\",\n        \"gender\": \"Female\",\n        \"registrationNumber\": \"BR/2024/001234\"\n      },\n      \"additionalDetails\": {\n        \"hospitalName\": \"City Hospital\",\n        \"doctorName\": \"Dr. Kumar\",\n        \"timeOfBirth\": \"14:30\",\n        \"weight\": \"3.2 kg\"\n      }\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_create",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_create"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Certificate - Marriage Certificate",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_create\",\n    \"did\": \"1\",\n    \"msgId\": \"{{$guid}}\",\n    \"authToken\": \"{{auth_token}}\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"marriage.registrar\",\n      \"name\": \"Marriage Registrar\",\n      \"type\": \"EMPLOYEE\",\n      \"mobileNumber\": \"9876543211\",\n      \"emailId\": \"marriage.registrar@punjab.gov.in\",\n      \"uuid\": \"{{$guid}}\",\n      \"roles\": [\n        {\n          \"name\": \"CERTIFICATE_ISSUER\",\n          \"code\": \"CERTIFICATE_ISSUER\",\n          \"tenantId\": \"pb.mohali\"\n        }\n      ]\n    }\n  },\n  \"certificates\": [\n    {\n      \"tenantId\": \"pb.mohali\",\n      \"context\": \"https://www.w3.org/2018/credentials/v1\",\n      \"type\": [\"VerifiableCredential\", \"MarriageCertificate\"],\n      \"issuer\": {\n        \"id\": \"did:gov:pb:marriage-registration\",\n        \"name\": \"Marriage Registration Office\",\n        \"type\": \"DEPARTMENT\"\n      },\n      \"credentialSubject\": {\n        \"id\": \"did:couple:pb:9876543210\",\n        \"brideName\": \"Priya Sharma\",\n        \"groomName\": \"Rahul Kumar\",\n        \"marriageDate\": \"2024-01-15\",\n        \"marriagePlace\": \"Gurudwara Sahib, Mohali\",\n        \"brideAge\": 26,\n        \"groomAge\": 28,\n        \"registrationNumber\": \"MR/2024/001001\"\n      },\n      \"additionalDetails\": {\n        \"ceremony\": \"Sikh\",\n        \"witnesses\": [\"Witness 1\", \"Witness 2\"],\n        \"priest\": \"Giani Singh\"\n      }\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_create",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_create"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Bulk Certificates",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_create\",\n    \"did\": \"1\",\n    \"msgId\": \"{{$guid}}\",\n    \"authToken\": \"{{auth_token}}\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"bulk.processor\",\n      \"name\": \"Bulk Certificate Processor\",\n      \"type\": \"EMPLOYEE\",\n      \"uuid\": \"{{$guid}}\"\n    }\n  },\n  \"certificates\": [\n    {\n      \"tenantId\": \"pb.mohali\",\n      \"context\": \"https://www.w3.org/2018/credentials/v1\",\n      \"type\": [\"VerifiableCredential\", \"BirthCertificate\"],\n      \"issuer\": {\n        \"id\": \"did:gov:pb:civil-registration\",\n        \"name\": \"Civil Registration Department\",\n        \"type\": \"DEPARTMENT\"\n      },\n      \"credentialSubject\": {\n        \"id\": \"did:citizen:pb:bulk001\",\n        \"name\": \"Child One\",\n        \"dateOfBirth\": \"2023-01-01\",\n        \"placeOfBirth\": \"Mohali, Punjab\"\n      }\n    },\n    {\n      \"tenantId\": \"pb.mohali\",\n      \"context\": \"https://www.w3.org/2018/credentials/v1\",\n      \"type\": [\"VerifiableCredential\", \"BirthCertificate\"],\n      \"issuer\": {\n        \"id\": \"did:gov:pb:civil-registration\",\n        \"name\": \"Civil Registration Department\",\n        \"type\": \"DEPARTMENT\"\n      },\n      \"credentialSubject\": {\n        \"id\": \"did:citizen:pb:bulk002\",\n        \"name\": \"Child Two\",\n        \"dateOfBirth\": \"2023-01-02\",\n        \"placeOfBirth\": \"Mohali, Punjab\"\n      }\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_create",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_create"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search Certificates - All Active",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_search\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"search.user\",\n      \"uuid\": \"{{$guid}}\"\n    }\n  },\n  \"searchCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"status\": \"ACTIVE\",\n    \"limit\": 10,\n    \"offset\": 0,\n    \"sortBy\": \"issued\",\n    \"sortOrder\": \"DESC\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_search",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search Certificates - By Certificate Type",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_search\"\n  },\n  \"searchCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"certificateTypes\": [\"BirthCertificate\"],\n    \"status\": \"ACTIVE\",\n    \"limit\": 20,\n    \"offset\": 0\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_search",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search Certificates - By Issuer",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_search\"\n  },\n  \"searchCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"issuerIds\": [\"did:gov:pb:civil-registration\"],\n    \"limit\": 15,\n    \"offset\": 0\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_search",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search Certificates - By Date Range",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_search\"\n  },\n  \"searchCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"fromDate\": 1672531200000,\n    \"toDate\": 1735689599000,\n    \"limit\": 25,\n    \"offset\": 0,\n    \"sortBy\": \"issued\",\n    \"sortOrder\": \"ASC\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_search",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search Certificates - By IDs",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_search\"\n  },\n  \"searchCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"ids\": [\"{{certificate_id_1}}\", \"{{certificate_id_2}}\"],\n    \"limit\": 10,\n    \"offset\": 0\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_search",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Certificate",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_update\",\n    \"did\": \"1\",\n    \"msgId\": \"{{$guid}}\",\n    \"authToken\": \"{{auth_token}}\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"civil.officer\",\n      \"name\": \"Civil Officer\",\n      \"type\": \"EMPLOYEE\",\n      \"uuid\": \"{{$guid}}\"\n    }\n  },\n  \"certificates\": [\n    {\n      \"id\": \"{{certificate_id_to_update}}\",\n      \"tenantId\": \"pb.mohali\",\n      \"context\": \"https://www.w3.org/2018/credentials/v1\",\n      \"type\": [\"VerifiableCredential\", \"BirthCertificate\"],\n      \"issuer\": {\n        \"id\": \"did:gov:pb:civil-registration\",\n        \"name\": \"Civil Registration Department - Updated\",\n        \"type\": \"DEPARTMENT\"\n      },\n      \"credentialSubject\": {\n        \"id\": \"did:citizen:pb:1234567890\",\n        \"name\": \"Jane Smith\",\n        \"dateOfBirth\": \"1990-05-15\",\n        \"placeOfBirth\": \"Mohali, Punjab\",\n        \"fatherName\": \"Robert Smith\",\n        \"motherName\": \"Mary Smith - Updated\",\n        \"gender\": \"Female\"\n      },\n      \"additionalDetails\": {\n        \"hospitalName\": \"City Hospital - Updated\",\n        \"updateReason\": \"Corrected mother's name\",\n        \"updatedBy\": \"Civil Officer\"\n      }\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_update",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_update"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Revoke Certificate",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_revoke\",\n    \"did\": \"1\",\n    \"msgId\": \"{{$guid}}\",\n    \"authToken\": \"{{auth_token}}\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"supervisor.officer\",\n      \"name\": \"Supervisor Officer\",\n      \"type\": \"EMPLOYEE\",\n      \"uuid\": \"{{$guid}}\",\n      \"roles\": [\n        {\n          \"name\": \"CERTIFICATE_SUPERVISOR\",\n          \"code\": \"CERTIFICATE_SUPERVISOR\",\n          \"tenantId\": \"pb.mohali\"\n        }\n      ]\n    }\n  },\n  \"revocationDetails\": [\n    {\n      \"certificateId\": \"{{certificate_id_to_revoke}}\",\n      \"tenantId\": \"pb.mohali\",\n      \"reason\": \"Data correction required - incorrect birth date found\"\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_revoke",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_revoke"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Revoke Multiple Certificates",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_revoke\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"supervisor.officer\",\n      \"uuid\": \"{{$guid}}\"\n    }\n  },\n  \"revocationDetails\": [\n    {\n      \"certificateId\": \"{{certificate_id_1}}\",\n      \"tenantId\": \"pb.mohali\",\n      \"reason\": \"System error - duplicate entry\"\n    },\n    {\n      \"certificateId\": \"{{certificate_id_2}}\",\n      \"tenantId\": \"pb.mohali\",\n      \"reason\": \"Legal requirement - court order\"\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_revoke",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_revoke"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Verify Certificate - Basic",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_verify\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"verifier.user\",\n      \"uuid\": \"{{$guid}}\"\n    }\n  },\n  \"verificationCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"certificateId\": \"{{certificate_id_to_verify}}\",\n    \"includeProofValidation\": true,\n    \"includeExpiryCheck\": true,\n    \"includeRevocationCheck\": true\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_verify",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_verify"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Verify Certificate - Advanced",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"RequestInfo\": {\n    \"apiId\": \"org.egov.certificate\",\n    \"ver\": \"1.0\",\n    \"ts\": {{$timestamp}},\n    \"action\": \"_verify\",\n    \"userInfo\": {\n      \"id\": 1,\n      \"userName\": \"advanced.verifier\",\n      \"uuid\": \"{{$guid}}\"\n    }\n  },\n  \"verificationCriteria\": {\n    \"tenantId\": \"pb.mohali\",\n    \"certificateId\": \"{{certificate_id_to_verify}}\",\n    \"includeProofValidation\": true,\n    \"includeExpiryCheck\": true,\n    \"includeRevocationCheck\": true,\n    \"additionalValidations\": {\n      \"checkSubjectExistence\": true,\n      \"validateContext\": true,\n      \"crossReference\": \"enabled\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/v1/_verify",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"v1",
+						"_verify"
+					]
+				}
+			},
+			"response": []
+		}\n	],\n	"event": [\n		{\n			"listen": "prerequest",\n			"script": {\n				"type": "text/javascript",\n				"exec": [\n					"// Generate dynamic values for requests",\n					"pm.globals.set('timestamp', Date.now());",\n					"pm.globals.set('guid', require('uuid').v4());",\n					"",\n					"// Set common headers if needed",\n					"pm.request.headers.add({",\n					"    key: 'Accept',",\n					"    value: 'application/json'",\n					"});"\n				]\n			}\n		},\n		{\n			"listen": "test",\n			"script": {\n				"type": "text/javascript",\n				"exec": [\n					"// Common test cases for all requests",\n					"pm.test('Response status code should be successful', function () {",\n					"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",\n					"});",\n					"",\n					"pm.test('Response should have proper content type', function () {",\n					"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",\n					"});",\n					"",\n					"pm.test('Response should contain ResponseInfo', function () {",\n					"    const responseJson = pm.response.json();",\n					"    pm.expect(responseJson).to.have.property('ResponseInfo');",\n					"    pm.expect(responseJson.ResponseInfo).to.have.property('status');",\n					"});",\n					"",\n					"// Store certificate IDs for subsequent requests",\n					"if (pm.response.json().certificates && pm.response.json().certificates.length > 0) {",\n					"    const certificates = pm.response.json().certificates;",\n					"    pm.globals.set('certificate_id_1', certificates[0].id);",\n					"    if (certificates.length > 1) {",\n					"        pm.globals.set('certificate_id_2', certificates[1].id);",\n					"    }",\n					"    pm.globals.set('certificate_id_to_update', certificates[0].id);",\n					"    pm.globals.set('certificate_id_to_revoke', certificates[0].id);",\n					"    pm.globals.set('certificate_id_to_verify', certificates[0].id);",\n					"}"\n				]\n			}\n		}\n	],\n	"variable": [\n		{\n			"key": "base_url",\n			"value": "http://localhost:8039/certificate-service",\n			"type": "string"\n		},\n		{\n			"key": "auth_token",\n			"value": "sample-auth-token-12345",\n			"type": "string"\n		}\n	]\n}
